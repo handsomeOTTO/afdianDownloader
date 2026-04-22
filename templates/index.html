@@ -1,0 +1,1539 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>音频下载器</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+    <style>
+        :root {
+            --bg: #f4f6f8;
+            --card: #ffffff;
+            --line: #d9e0e7;
+            --text: #13243a;
+            --muted: #5c7088;
+            --ok: #1f8f5f;
+            --err: #b42318;
+            --accent: #0f5cbd;
+            --accent-2: #00ffd0;
+            --accent-3: #7a7dff;
+            --fx-bg-a: rgba(16, 112, 255, 0.35);
+            --fx-bg-b: rgba(0, 255, 208, 0.18);
+            --fx-bg-c: rgba(122, 125, 255, 0.2);
+            --fx-grad-start: #03050f;
+            --fx-grad-mid: #060a1f;
+            --fx-grad-end: #0a1331;
+            --fx-conic-a: rgba(0, 255, 208, 0.06);
+            --fx-conic-b: rgba(43, 166, 255, 0.1);
+            --fx-conic-c: rgba(122, 125, 255, 0.08);
+            --fx-card-bg: rgba(9, 17, 40, 0.72);
+            --fx-card-border: rgba(95, 171, 255, 0.25);
+            --fx-card-shadow: rgba(131, 204, 255, 0.08);
+            --fx-card-sweep: rgba(69, 200, 255, 0.23);
+            --fx-muted-text: #9eb7d9;
+            --fx-ctrl-bg: rgba(10, 23, 53, 0.75);
+            --fx-ctrl-border: rgba(95, 171, 255, 0.28);
+            --fx-active-border: rgba(125, 195, 255, 0.55);
+            --fx-btn-shadow: rgba(43, 166, 255, 0.45);
+            --fx-btn-glow: rgba(255, 255, 255, 0.1);
+            --fx-flash-ok-bg: rgba(31, 143, 95, 0.2);
+            --fx-flash-ok-text: #9cffcb;
+            --fx-flash-ok-border: rgba(134, 255, 196, 0.4);
+            --fx-flash-err-bg: rgba(180, 35, 24, 0.2);
+            --fx-flash-err-text: #ffb7b2;
+            --fx-flash-err-border: rgba(255, 158, 152, 0.4);
+            --fx-flash-info-bg: rgba(43, 166, 255, 0.18);
+            --fx-flash-info-text: #b4e4ff;
+            --fx-flash-info-border: rgba(117, 202, 255, 0.5);
+            --fx-table-head: rgba(58, 125, 235, 0.22);
+            --fx-table-line: rgba(95, 171, 255, 0.22);
+            --fx-op-bg: rgba(19, 43, 88, 0.75);
+            --fx-op-border: rgba(121, 188, 255, 0.45);
+            --fx-op-text: #d9ecff;
+            --fx-op-hover-bg: rgba(28, 62, 120, 0.85);
+            --fx-op-hover-border: rgba(152, 209, 255, 0.6);
+            --fx-progress-bg: rgba(40, 72, 125, 0.52);
+            --fx-progress-border: rgba(125, 195, 255, 0.35);
+            --fx-progress-glow: rgba(87, 198, 255, 0.7);
+            --fx-logs-bg: rgba(5, 14, 36, 0.72);
+            --fx-logs-border: rgba(95, 171, 255, 0.22);
+            --fx-logs-text: #d4e8ff;
+            --fx-particle-rgb: 104, 210, 255;
+            --fx-particle-mode: orb;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 24px;
+            font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: linear-gradient(180deg, #edf3ff, #f9fbff 40%, #f4f6f8);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .fx-layer {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        body.ai-fx-enabled {
+            background:
+                radial-gradient(circle at 20% 20%, var(--fx-bg-a), transparent 35%),
+                radial-gradient(circle at 80% 0%, var(--fx-bg-b), transparent 35%),
+                radial-gradient(circle at 50% 100%, var(--fx-bg-c), transparent 40%),
+                linear-gradient(180deg, var(--fx-grad-start), var(--fx-grad-mid) 45%, var(--fx-grad-end) 100%);
+            color: #e8f2ff;
+        }
+        body.ai-fx-enabled::before {
+            content: "";
+            position: fixed;
+            inset: -20%;
+            z-index: -2;
+            pointer-events: none;
+            background: conic-gradient(from 0deg, var(--fx-conic-a), var(--fx-conic-b), var(--fx-conic-c), var(--fx-conic-a));
+            filter: blur(45px);
+            animation: spinGlow 20s linear infinite;
+        }
+        body.ai-fx-enabled .fx-layer {
+            display: block;
+        }
+
+        .container {
+            max-width: 1180px;
+            margin: 0 auto;
+            display: grid;
+            gap: 16px;
+        }
+        .card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 16px;
+        }
+        .top-card {
+            position: relative;
+            overflow: visible;
+        }
+        body.ai-fx-enabled .card {
+            background: var(--fx-card-bg);
+            border-color: var(--fx-card-border);
+            backdrop-filter: blur(9px);
+            box-shadow: 0 0 0 1px var(--fx-card-shadow), 0 18px 45px rgba(0, 0, 0, 0.38);
+            position: relative;
+            overflow: hidden;
+        }
+        body.ai-fx-enabled .top-card {
+            overflow: visible;
+        }
+        body.ai-fx-enabled .card::before {
+            content: "";
+            position: absolute;
+            left: -25%;
+            top: -120%;
+            width: 40%;
+            height: 320%;
+            background: linear-gradient(180deg, transparent, var(--fx-card-sweep), transparent);
+            transform: rotate(18deg);
+            animation: cardSweep 7s linear infinite;
+            pointer-events: none;
+        }
+        body.ai-fx-enabled .top-card::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            border-radius: 12px;
+            z-index: 0;
+            opacity: 0;
+        }
+        body.ai-fx-enabled h1 {
+            position: relative;
+            z-index: 1;
+        }
+        body.ai-fx-enabled .tabs,
+        body.ai-fx-enabled .tab-panel {
+            position: relative;
+            z-index: 1;
+        }
+
+        h1 { margin: 0 0 8px; font-size: 24px; }
+        h2 { margin: 0 0 8px; font-size: 18px; }
+        p { margin: 0 0 12px; color: var(--muted); }
+        body.ai-fx-enabled p,
+        body.ai-fx-enabled .progress-meta { color: var(--fx-muted-text); }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .tab-btn {
+            border: 1px solid var(--line);
+            background: #f5f8ff;
+            color: var(--text);
+            border-radius: 999px;
+            padding: 7px 14px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .tab-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+        body.ai-fx-enabled .tab-btn {
+            background: var(--fx-ctrl-bg);
+            color: #e8f2ff;
+            border-color: var(--fx-ctrl-border);
+        }
+        body.ai-fx-enabled .tab-btn.active {
+            background: linear-gradient(110deg, var(--accent), var(--accent-3));
+            border-color: var(--fx-active-border);
+        }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+        .tab-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .tab-actions button { width: auto; min-width: 140px; }
+        .editor-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+        }
+        .editor-span-2 { grid-column: span 2; }
+        .editor-full { grid-column: 1 / -1; }
+        .drop-zone {
+            border: 1px dashed #9ab4d6;
+            border-radius: 10px;
+            padding: 14px;
+            background: #f6f9ff;
+            text-align: center;
+            color: var(--muted);
+            cursor: pointer;
+        }
+        .drop-zone.dragover {
+            border-color: var(--accent);
+            background: #eaf2ff;
+            color: var(--text);
+        }
+        .cover-preview-wrap {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 6px;
+        }
+        .cover-preview {
+            width: 96px;
+            height: 96px;
+            border-radius: 8px;
+            border: 1px solid var(--line);
+            object-fit: cover;
+            background: #f4f6f8;
+        }
+        .cover-empty {
+            font-size: 12px;
+            color: var(--muted);
+        }
+        .cover-panel {
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 10px;
+            background: #fafcff;
+            height: 100%;
+        }
+        label { font-size: 13px; font-weight: 600; margin-bottom: 4px; display: block; }
+        input, select, textarea, button {
+            width: 100%;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 14px;
+        }
+        body.ai-fx-enabled input,
+        body.ai-fx-enabled select,
+        body.ai-fx-enabled textarea,
+        body.ai-fx-enabled button {
+            background: var(--fx-ctrl-bg);
+            color: #e8f2ff;
+            border-color: var(--fx-ctrl-border);
+        }
+        body.ai-fx-enabled input::placeholder,
+        body.ai-fx-enabled textarea::placeholder { color: #9cb5d7; }
+        body.ai-fx-enabled input:focus,
+        body.ai-fx-enabled select:focus,
+        body.ai-fx-enabled textarea:focus {
+            outline: none;
+            box-shadow: 0 0 0 1px var(--fx-active-border), 0 0 14px rgba(120, 190, 255, 0.22);
+        }
+
+        textarea { min-height: 84px; resize: vertical; }
+        button {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+            font-weight: 600;
+            cursor: pointer;
+        }
+        body.ai-fx-enabled button {
+            background: linear-gradient(110deg, var(--accent), var(--accent-3));
+            border-color: var(--fx-active-border);
+            box-shadow: 0 0 14px var(--fx-btn-shadow), inset 0 0 14px var(--fx-btn-glow);
+            position: relative;
+            overflow: hidden;
+        }
+        body.ai-fx-enabled button::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: -120%;
+            width: 70%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+            transform: skewX(-20deg);
+            animation: buttonSweep 3s ease-in-out infinite;
+        }
+        body.ai-fx-enabled .cover-panel {
+            background: linear-gradient(160deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.06));
+            box-shadow: inset 0 0 18px rgba(255, 255, 255, 0.04);
+        }
+
+        .full { grid-column: 1 / -1; }
+        .checkbox-row { display: flex; align-items: center; gap: 8px; }
+        .checkbox-row input { width: auto; }
+        .theme-row {
+            position: absolute;
+            top: 12px;
+            right: 16px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            z-index: 6;
+        }
+        .theme-row label {
+            margin: 0;
+            min-width: 32px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .theme-row select {
+            width: 110px;
+            min-width: 110px;
+            padding: 4px 8px;
+            font-size: 12px;
+            border-radius: 6px;
+            position: relative;
+            z-index: 7;
+        }
+
+        .flash { padding: 8px 10px; border-radius: 8px; margin-bottom: 8px; font-size: 13px; }
+        .flash.success { background: #eafaf2; color: var(--ok); border: 1px solid #b8e6cf; }
+        .flash.error { background: #fff0ef; color: var(--err); border: 1px solid #f3c5c1; }
+        .flash.info { background: #eef4ff; color: #174ea6; border: 1px solid #c6d8ff; }
+        body.ai-fx-enabled .flash.success { background: var(--fx-flash-ok-bg); color: var(--fx-flash-ok-text); border-color: var(--fx-flash-ok-border); }
+        body.ai-fx-enabled .flash.error { background: var(--fx-flash-err-bg); color: var(--fx-flash-err-text); border-color: var(--fx-flash-err-border); }
+        body.ai-fx-enabled .flash.info { background: var(--fx-flash-info-bg); color: var(--fx-flash-info-text); border-color: var(--fx-flash-info-border); }
+
+        .mono { font-family: Consolas, "Courier New", monospace; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th, td { border-bottom: 1px solid var(--line); padding: 8px; text-align: left; vertical-align: top; }
+        th { background: #f8fafc; }
+        th.col-status, td.col-status {
+            width: 92px;
+            min-width: 92px;
+        }
+        th.col-author, td.col-author {
+            white-space: nowrap;
+            width: 120px;
+            min-width: 120px;
+        }
+        th.col-source, td.col-source {
+            width: 150px;
+            max-width: 150px;
+        }
+        th.col-file, td.col-file {
+            width: 170px;
+            max-width: 170px;
+        }
+        td.col-source,
+        td.col-file {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        th.col-action, td.col-action {
+            width: 170px;
+            min-width: 170px;
+        }
+        .action-wrap {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .op-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 4px 10px;
+            border: 1px solid #b9cae2;
+            border-radius: 7px;
+            background: #f1f6ff;
+            color: #174ea6;
+            text-decoration: none;
+            white-space: nowrap;
+            font-size: 12px;
+            line-height: 1.2;
+        }
+        .op-btn:hover {
+            background: #e6efff;
+            border-color: #9db5d9;
+        }
+        body.ai-fx-enabled th { background: var(--fx-table-head); }
+        body.ai-fx-enabled td,
+        body.ai-fx-enabled th { border-bottom-color: var(--fx-table-line); }
+        body.ai-fx-enabled .op-btn {
+            background: var(--fx-op-bg);
+            border-color: var(--fx-op-border);
+            color: var(--fx-op-text);
+        }
+        body.ai-fx-enabled .op-btn:hover {
+            background: var(--fx-op-hover-bg);
+            border-color: var(--fx-op-hover-border);
+        }
+
+        .progress-wrap { margin-top: 8px; }
+        .progress-bar {
+            width: 100%;
+            height: 12px;
+            background: #e9eef5;
+            border-radius: 999px;
+            overflow: hidden;
+            border: 1px solid #d6deea;
+        }
+        body.ai-fx-enabled .progress-bar {
+            background: var(--fx-progress-bg);
+            border-color: var(--fx-progress-border);
+        }
+
+        .progress-fill {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #0f5cbd, #1b82e6);
+            transition: width 0.2s ease;
+        }
+        body.ai-fx-enabled .progress-fill {
+            background: linear-gradient(90deg, var(--accent), var(--accent-2), var(--accent-3));
+            background-size: 220% 100%;
+            animation: waveFlow 1.6s linear infinite;
+            box-shadow: 0 0 10px var(--fx-progress-glow);
+        }
+
+        .progress-meta { margin-top: 8px; display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--muted); }
+        .logs {
+            margin-top: 8px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 8px;
+            max-height: 180px;
+            overflow: auto;
+            background: #fbfdff;
+            font-family: Consolas, "Courier New", monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        body.ai-fx-enabled .logs {
+            background: var(--fx-logs-bg);
+            border-color: var(--fx-logs-border);
+            color: var(--fx-logs-text);
+        }
+
+        body[data-theme="neon"] {
+            --accent: #ff2ccf;
+            --accent-2: #34ffd3;
+            --accent-3: #7d62ff;
+            --fx-bg-a: rgba(255, 44, 207, 0.28);
+            --fx-bg-b: rgba(52, 255, 211, 0.2);
+            --fx-bg-c: rgba(125, 98, 255, 0.24);
+            --fx-grad-start: #120017;
+            --fx-grad-mid: #1c0830;
+            --fx-grad-end: #0a0a25;
+            --fx-conic-a: rgba(255, 44, 207, 0.08);
+            --fx-conic-b: rgba(52, 255, 211, 0.1);
+            --fx-conic-c: rgba(125, 98, 255, 0.08);
+            --fx-card-border: rgba(255, 138, 236, 0.36);
+            --fx-card-shadow: rgba(255, 113, 236, 0.15);
+            --fx-card-sweep: rgba(255, 121, 241, 0.24);
+            --fx-ctrl-border: rgba(255, 144, 236, 0.38);
+            --fx-active-border: rgba(255, 173, 243, 0.64);
+            --fx-btn-shadow: rgba(246, 86, 255, 0.5);
+            --fx-table-head: rgba(162, 78, 255, 0.24);
+            --fx-table-line: rgba(209, 135, 255, 0.24);
+            --fx-progress-glow: rgba(255, 103, 232, 0.72);
+            --fx-op-border: rgba(255, 168, 245, 0.5);
+            --fx-particle-rgb: 255, 121, 241;
+            --fx-particle-mode: orb;
+        }
+        body[data-theme="neon"].ai-fx-enabled h1 {
+            text-shadow: 0 0 8px rgba(255, 115, 236, 0.8), 0 0 28px rgba(114, 255, 228, 0.45);
+            animation: neonTitlePulse 2.8s ease-in-out infinite;
+        }
+        body[data-theme="neon"].ai-fx-enabled .tab-btn {
+            box-shadow: inset 0 0 0 1px rgba(255, 152, 240, 0.22);
+        }
+        body[data-theme="neon"].ai-fx-enabled .tab-btn.active {
+            box-shadow: 0 0 14px rgba(255, 86, 236, 0.45), 0 0 28px rgba(111, 247, 255, 0.28);
+            animation: neonPulse 1.8s ease-in-out infinite;
+        }
+        body[data-theme="neon"].ai-fx-enabled .card {
+            box-shadow: 0 0 0 1px rgba(255, 134, 244, 0.16), 0 0 24px rgba(255, 104, 232, 0.2), 0 18px 45px rgba(0, 0, 0, 0.45);
+        }
+        body[data-theme="neon"].ai-fx-enabled .top-card::after {
+            opacity: 1;
+            background: repeating-linear-gradient(90deg, rgba(255, 109, 233, 0.06) 0 1px, transparent 1px 11px);
+            mix-blend-mode: screen;
+            animation: neonScan 4s linear infinite;
+        }
+        body[data-theme="neon"].ai-fx-enabled button {
+            animation: neonButtonBeat 1.8s ease-in-out infinite;
+        }
+
+        body[data-theme="holo"] {
+            --accent: #15d1ff;
+            --accent-2: #5dffdf;
+            --accent-3: #5d8cff;
+            --fx-bg-a: rgba(21, 209, 255, 0.2);
+            --fx-bg-b: rgba(93, 255, 223, 0.12);
+            --fx-bg-c: rgba(93, 140, 255, 0.16);
+            --fx-grad-start: #03111d;
+            --fx-grad-mid: #041d2e;
+            --fx-grad-end: #05122f;
+            --fx-card-border: rgba(111, 218, 255, 0.34);
+            --fx-card-sweep: rgba(114, 226, 255, 0.26);
+            --fx-op-border: rgba(143, 225, 255, 0.5);
+            --fx-particle-rgb: 121, 222, 255;
+            --fx-particle-mode: streak;
+        }
+        body[data-theme="holo"].ai-fx-enabled .card::before {
+            animation-duration: 3.2s;
+            width: 28%;
+            opacity: 0.95;
+        }
+        body[data-theme="holo"].ai-fx-enabled h1 {
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            text-shadow: 0 0 10px rgba(111, 222, 255, 0.6);
+        }
+        body[data-theme="holo"].ai-fx-enabled .top-card::after {
+            opacity: 1;
+            background:
+                linear-gradient(120deg, rgba(110, 229, 255, 0.12), rgba(97, 141, 255, 0.12)),
+                repeating-linear-gradient(0deg, rgba(110, 229, 255, 0.08) 0 2px, transparent 2px 16px);
+            animation: holoPanelShift 6.5s linear infinite;
+        }
+        body[data-theme="holo"].ai-fx-enabled input,
+        body[data-theme="holo"].ai-fx-enabled select,
+        body[data-theme="holo"].ai-fx-enabled textarea {
+            backdrop-filter: blur(10px) saturate(120%);
+            border-style: dashed;
+        }
+        body[data-theme="holo"].ai-fx-enabled button::before {
+            animation-duration: 1.6s;
+        }
+
+        body[data-theme="terminal"] {
+            --accent: #16d47b;
+            --accent-2: #95ff6a;
+            --accent-3: #17a15e;
+            --fx-bg-a: rgba(36, 255, 144, 0.12);
+            --fx-bg-b: rgba(149, 255, 106, 0.08);
+            --fx-bg-c: rgba(23, 161, 94, 0.1);
+            --fx-grad-start: #040a06;
+            --fx-grad-mid: #08120a;
+            --fx-grad-end: #020703;
+            --fx-card-bg: rgba(6, 20, 11, 0.78);
+            --fx-card-border: rgba(120, 255, 165, 0.25);
+            --fx-muted-text: #8fc9a1;
+            --fx-ctrl-bg: rgba(7, 24, 12, 0.75);
+            --fx-ctrl-border: rgba(96, 214, 133, 0.34);
+            --fx-active-border: rgba(150, 255, 177, 0.55);
+            --fx-table-head: rgba(35, 129, 73, 0.28);
+            --fx-table-line: rgba(77, 166, 108, 0.22);
+            --fx-op-bg: rgba(9, 40, 19, 0.78);
+            --fx-op-border: rgba(111, 224, 149, 0.45);
+            --fx-op-hover-bg: rgba(15, 62, 30, 0.9);
+            --fx-op-hover-border: rgba(151, 242, 181, 0.62);
+            --fx-particle-rgb: 132, 255, 172;
+            --fx-particle-mode: rain;
+        }
+        body[data-theme="terminal"].ai-fx-enabled h1 {
+            color: #9cffbd;
+            text-shadow: 0 0 8px rgba(126, 255, 175, 0.45);
+        }
+        body[data-theme="terminal"].ai-fx-enabled .tab-btn,
+        body[data-theme="terminal"].ai-fx-enabled button,
+        body[data-theme="terminal"].ai-fx-enabled .op-btn {
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        body[data-theme="terminal"].ai-fx-enabled .tabs::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: -6px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(153, 255, 191, 0.55), transparent);
+            animation: terminalLine 2.2s linear infinite;
+        }
+        body[data-theme="terminal"].ai-fx-enabled button::before {
+            display: none;
+        }
+        body[data-theme="terminal"].ai-fx-enabled button {
+            box-shadow: inset 0 0 0 1px rgba(124, 255, 166, 0.4), 0 0 10px rgba(66, 214, 112, 0.22);
+        }
+        body[data-theme="terminal"].ai-fx-enabled input:focus,
+        body[data-theme="terminal"].ai-fx-enabled select:focus,
+        body[data-theme="terminal"].ai-fx-enabled textarea:focus {
+            box-shadow: 0 0 0 1px rgba(151, 255, 183, 0.62), 0 0 10px rgba(102, 234, 146, 0.3);
+        }
+
+        body[data-theme="liquid"] {
+            --accent: #7c61ff;
+            --accent-2: #48d8ff;
+            --accent-3: #31ffc9;
+            --fx-bg-a: rgba(124, 97, 255, 0.22);
+            --fx-bg-b: rgba(72, 216, 255, 0.14);
+            --fx-bg-c: rgba(49, 255, 201, 0.13);
+            --fx-grad-start: #090b1d;
+            --fx-grad-mid: #11152d;
+            --fx-grad-end: #0a1734;
+            --fx-card-bg: rgba(17, 24, 53, 0.58);
+            --fx-card-border: rgba(142, 187, 255, 0.24);
+            --fx-card-shadow: rgba(134, 165, 255, 0.18);
+            --fx-card-sweep: rgba(122, 188, 255, 0.16);
+            --fx-muted-text: #b2bfeb;
+            --fx-ctrl-bg: rgba(18, 29, 63, 0.68);
+            --fx-ctrl-border: rgba(142, 177, 255, 0.3);
+            --fx-active-border: rgba(173, 206, 255, 0.52);
+            --fx-btn-shadow: rgba(109, 168, 255, 0.56);
+            --fx-btn-glow: rgba(190, 233, 255, 0.12);
+            --fx-table-head: rgba(91, 124, 219, 0.24);
+            --fx-table-line: rgba(107, 151, 225, 0.22);
+            --fx-op-bg: rgba(30, 47, 94, 0.74);
+            --fx-op-border: rgba(140, 179, 255, 0.43);
+            --fx-op-hover-bg: rgba(45, 65, 124, 0.84);
+            --fx-op-hover-border: rgba(176, 214, 255, 0.6);
+            --fx-progress-bg: rgba(56, 80, 145, 0.52);
+            --fx-progress-border: rgba(137, 179, 255, 0.34);
+            --fx-progress-glow: rgba(123, 206, 255, 0.68);
+            --fx-particle-rgb: 138, 206, 255;
+            --fx-particle-mode: diamond;
+        }
+        body[data-theme="liquid"].ai-fx-enabled .card {
+            backdrop-filter: blur(14px) saturate(130%);
+            animation: liquidCardFloat 5.2s ease-in-out infinite;
+        }
+        body[data-theme="liquid"].ai-fx-enabled .card::before {
+            animation-duration: 11s;
+            width: 52%;
+            opacity: 0.45;
+        }
+        body[data-theme="liquid"].ai-fx-enabled h1 {
+            text-shadow: 0 0 12px rgba(145, 200, 255, 0.5), 0 0 32px rgba(80, 236, 255, 0.25);
+        }
+        body[data-theme="liquid"].ai-fx-enabled .top-card::after {
+            opacity: 1;
+            background: radial-gradient(circle at 20% 25%, rgba(143, 189, 255, 0.22), transparent 40%),
+                        radial-gradient(circle at 80% 70%, rgba(83, 235, 255, 0.17), transparent 46%);
+            animation: liquidSurface 9s ease-in-out infinite alternate;
+        }
+        body[data-theme="liquid"].ai-fx-enabled button {
+            border-radius: 12px;
+        }
+        body[data-theme="liquid"].ai-fx-enabled button::before {
+            transform: skewX(-12deg);
+            animation-duration: 2.1s;
+        }
+
+        body[data-theme="holo"].ai-fx-enabled::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: -1;
+            background:
+                linear-gradient(transparent 0%, rgba(90, 219, 255, 0.09) 48%, transparent 52%, transparent 100%),
+                repeating-linear-gradient(90deg, rgba(99, 229, 255, 0.06) 0 1px, transparent 1px 80px),
+                repeating-linear-gradient(180deg, rgba(99, 229, 255, 0.05) 0 1px, transparent 1px 80px);
+            animation: holoSweep 8s linear infinite;
+        }
+        body[data-theme="terminal"].ai-fx-enabled {
+            font-family: Consolas, "Courier New", monospace;
+        }
+        body[data-theme="terminal"].ai-fx-enabled .card,
+        body[data-theme="terminal"].ai-fx-enabled input,
+        body[data-theme="terminal"].ai-fx-enabled select,
+        body[data-theme="terminal"].ai-fx-enabled textarea,
+        body[data-theme="terminal"].ai-fx-enabled button {
+            border-radius: 4px;
+        }
+        body[data-theme="terminal"].ai-fx-enabled::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 1;
+            background: repeating-linear-gradient(180deg, rgba(120, 255, 165, 0.055) 0 1px, transparent 1px 3px);
+            mix-blend-mode: screen;
+            animation: crtFlicker 0.22s steps(2, end) infinite;
+        }
+        body[data-theme="liquid"].ai-fx-enabled::after {
+            content: "";
+            position: fixed;
+            inset: -15%;
+            pointer-events: none;
+            z-index: -1;
+            background:
+                radial-gradient(circle at 15% 25%, rgba(126, 172, 255, 0.3), transparent 35%),
+                radial-gradient(circle at 80% 10%, rgba(72, 216, 255, 0.22), transparent 40%),
+                radial-gradient(circle at 70% 80%, rgba(49, 255, 201, 0.18), transparent 45%);
+            filter: blur(26px);
+            animation: liquidDrift 14s ease-in-out infinite alternate;
+        }
+
+        @keyframes spinGlow {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        @keyframes cardSweep {
+            0% { left: -30%; }
+            100% { left: 130%; }
+        }
+        @keyframes buttonSweep {
+            0% { left: -120%; }
+            60%, 100% { left: 150%; }
+        }
+        @keyframes waveFlow {
+            0% { background-position: 0% 0%; }
+            100% { background-position: 220% 0%; }
+        }
+        @keyframes holoSweep {
+            0% { transform: translateY(-18%); opacity: 0.32; }
+            50% { opacity: 0.6; }
+            100% { transform: translateY(18%); opacity: 0.32; }
+        }
+        @keyframes crtFlicker {
+            0%, 100% { opacity: 0.28; }
+            50% { opacity: 0.4; }
+        }
+        @keyframes liquidDrift {
+            0% { transform: translate(-2%, -1%) scale(1); }
+            100% { transform: translate(2%, 1.5%) scale(1.08); }
+        }
+        @keyframes neonTitlePulse {
+            0%, 100% { filter: saturate(105%); }
+            50% { filter: saturate(145%); }
+        }
+        @keyframes neonPulse {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-1px); }
+        }
+        @keyframes neonButtonBeat {
+            0%, 100% { box-shadow: 0 0 10px rgba(255, 104, 232, 0.35), inset 0 0 14px rgba(255, 255, 255, 0.12); }
+            50% { box-shadow: 0 0 18px rgba(255, 104, 232, 0.5), inset 0 0 18px rgba(255, 255, 255, 0.16); }
+        }
+        @keyframes neonScan {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(20px); }
+        }
+        @keyframes holoPanelShift {
+            0% { transform: translateX(-1.5%) translateY(-1%); }
+            100% { transform: translateX(1.5%) translateY(1%); }
+        }
+        @keyframes terminalLine {
+            0% { opacity: 0.25; transform: scaleX(0.85); }
+            50% { opacity: 0.9; transform: scaleX(1); }
+            100% { opacity: 0.25; transform: scaleX(0.85); }
+        }
+        @keyframes liquidCardFloat {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-2px); }
+        }
+        @keyframes liquidSurface {
+            0% { transform: translate(-1.5%, -1%); }
+            100% { transform: translate(1.5%, 1%); }
+        }
+
+        @media (max-width: 900px) {
+            .grid { grid-template-columns: 1fr; }
+            .editor-grid { grid-template-columns: 1fr; }
+            .editor-span-2 { grid-column: auto; }
+            .progress-meta { flex-direction: column; }
+            .theme-row {
+                position: static;
+                margin-top: 8px;
+                justify-content: flex-end;
+            }
+        }
+    </style>
+</head>
+<body>
+<canvas id="fx-layer" class="fx-layer"></canvas>
+<div class="container">
+    <div class="card top-card">
+        <h1>音频下载器</h1>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div>
+                    {% for category, message in messages %}
+                        <div class="flash {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <div class="tabs" id="source-tabs">
+            <button type="button" class="tab-btn active" data-tab="afdian">爱发电</button>
+            <button type="button" class="tab-btn" data-tab="rss">RSS</button>
+            <button type="button" class="tab-btn" data-tab="editor">信息编辑</button>
+        </div>
+        <div class="theme-row">
+            <label for="theme_select">主题</label>
+            <select id="theme_select">
+                <option value="default">默认</option>
+                <option value="neon">霓虹</option>
+                <option value="holo">全息</option>
+                <option value="terminal">终端</option>
+                <option value="liquid">流体</option>
+            </select>
+        </div>
+
+        <div class="tab-panel active" id="tab-afdian">
+            <form action="{{ url_for('run') }}" method="post">
+                <input type="hidden" name="provider" value="afdian">
+                <div class="grid">
+                    <div class="full">
+                        <label>授权令牌</label>
+                        <input name="auth_token" value="{{ auth_token }}" placeholder="从浏览器 Cookie 获取">
+                    </div>
+                    <div>
+                        <label>下载模式</label>
+                        <select name="mode">
+                            <option value="latest">最新内容</option>
+                            <option value="all">整张专辑</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>专辑 ID（与帖子 ID 互斥）</label>
+                        <input name="album_id" placeholder="例如 c277de065aa111eda82052540025c377">
+                    </div>
+                    <div>
+                        <label>下载数量</label>
+                        <input name="latest_n" value="1" type="number" min="1">
+                    </div>
+                    <div>
+                        <label>专辑名（必填）</label>
+                        <input name="album_name" placeholder="填写后自动按专辑名分文件夹" required>
+                    </div>
+                    <div class="full">
+                        <label>帖子 ID（与专辑 ID 互斥）</label>
+                        <textarea name="post_ids" placeholder="bcbe338e2dbb11f181a25254001e7c00&#10;多个可用逗号或换行分隔"></textarea>
+                    </div>
+                    <div>
+                        <label>输出目录</label>
+                        <input name="output_dir" value="media/downloads">
+                    </div>
+                    <div class="checkbox-row">
+                        <input id="afdian_list_only" type="checkbox" name="list_only">
+                        <label for="afdian_list_only">仅列出，不下载文件</label>
+                    </div>
+                    <div class="full">
+                        <button type="submit">开始爱发电下载</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="tab-panel" id="tab-rss">
+            <form action="{{ url_for('run') }}" method="post">
+                <input type="hidden" name="provider" value="rss">
+                <div class="grid">
+                    <div class="full">
+                        <label>RSS 地址</label>
+                        <input name="rss_url" placeholder="例如 https://siji.typlog.io/feed/audio.xml">
+                    </div>
+                    <div>
+                        <label>下载条数</label>
+                        <input name="rss_latest_n" value="1" type="number" min="1">
+                    </div>
+                    <div>
+                        <label>作者名</label>
+                        <input name="rss_author_name" placeholder="可留空">
+                    </div>
+                    <div>
+                        <label>专辑名（必填）</label>
+                        <input name="album_name" placeholder="填写后自动按专辑名分文件夹" required>
+                    </div>
+                    <div>
+                        <label>输出目录</label>
+                        <input name="output_dir" value="media/downloads">
+                    </div>
+                    <div class="checkbox-row">
+                        <input id="rss_list_only" type="checkbox" name="list_only">
+                        <label for="rss_list_only">仅列出，不下载文件</label>
+                    </div>
+                    <div class="full">
+                        <button type="submit">执行 RSS 任务</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="tab-panel" id="tab-editor">
+            <form id="tag-editor-form">
+                <div class="editor-grid">
+                    <div class="editor-full">
+                        <label>拖拽音频</label>
+                        <div id="audio-drop-zone" class="drop-zone">拖拽 MP3 到这里</div>
+                    </div>
+                    <div class="editor-full">
+                        <label>音频文件路径</label>
+                        <input id="edit_file_path" name="file_path" placeholder="例如 D:\python\project\afdianDownloader\media\downloads\xxx.mp3" required>
+                    </div>
+                    <div>
+                        <label>标题</label>
+                        <input id="edit_title" name="title" placeholder="标题">
+                    </div>
+                    <div>
+                        <label>作者</label>
+                        <input id="edit_artist" name="artist" placeholder="作者">
+                    </div>
+                    <div>
+                        <label>专辑</label>
+                        <input id="edit_album" name="album" placeholder="专辑">
+                    </div>
+                    <div>
+                        <label>年份</label>
+                        <input id="edit_year" name="year" placeholder="例如 2026">
+                    </div>
+                    <div class="editor-span-2">
+                        <label>描述 / 评论</label>
+                        <textarea id="edit_description" name="description" placeholder="描述或评论"></textarea>
+                    </div>
+                    <div class="cover-panel">
+                        <label>专辑封面</label>
+                        <div class="cover-preview-wrap">
+                            <img id="cover-preview" class="cover-preview" alt="封面预览" style="display:none;">
+                            <span id="cover-empty-text" class="cover-empty">当前没有封面</span>
+                        </div>
+                        <input id="edit_cover_file" name="cover_file" type="file" accept="image/*">
+                    </div>
+                    <div class="editor-full tab-actions">
+                        <button type="button" id="load-tag-btn">加载信息</button>
+                        <button type="button" id="save-tag-btn">保存信息</button>
+                    </div>
+                    <div class="editor-full">
+                        <div id="tag-editor-message" class="flash info" style="display:none;"></div>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+    </div>
+
+    <div class="card" id="job-card" style="display:none;">
+        <h2>当前任务进度</h2>
+        <div class="progress-wrap">
+            <div class="progress-bar"><div class="progress-fill" id="overall-progress"></div></div>
+            <div class="progress-meta">
+                <span id="overall-text">等待任务开始...</span>
+                <span id="overall-percent">0%</span>
+            </div>
+        </div>
+
+        <div class="progress-wrap">
+            <div class="progress-bar"><div class="progress-fill" id="file-progress"></div></div>
+            <div class="progress-meta">
+                <span id="file-text">当前文件: -</span>
+                <span id="file-percent">0%</span>
+            </div>
+        </div>
+
+        <div class="logs" id="job-logs">暂无日志</div>
+    </div>
+
+    <div class="card">
+        <h1>最近下载记录</h1>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>时间</th>
+                    <th class="col-status">状态</th>
+                    <th>标题</th>
+                    <th class="col-author">作者</th>
+                    <th class="col-source">来源</th>
+                    <th class="col-file">文件</th>
+                    <th class="col-action">操作</th>
+                    <th>错误</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in records %}
+                    <tr>
+                        <td>{{ row.id }}</td>
+                        <td>{{ row.created_at }}</td>
+                        <td class="col-status">{{ row.status }}</td>
+                        <td>{{ row.title }}</td>
+                        <td class="col-author">{{ row.author }}</td>
+                        <td class="mono col-source">{{ row.source_type }}:{{ row.source_id }}</td>
+                        <td class="mono col-file">{{ row.file_path if row.local_file_exists else "-" }}</td>
+                        <td class="col-action">
+                            {% if row.local_file_exists %}
+                                <div class="action-wrap">
+                                    <a class="op-btn" href="{{ url_for('download_record_file', record_id=row.id) }}">下载</a>
+                                    <a class="op-btn edit-record-link" href="#" data-path="{{ row.file_path }}">编辑信息</a>
+                                </div>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{{ row.error_message or "-" }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="9">暂无记录。</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const activeJobId = "{{ active_job_id }}";
+    const activeSource = "{{ active_source or 'afdian' }}";
+    const THEME_STORAGE_KEY = "afdian_ui_theme";
+    const SOURCE_TAB_STORAGE_KEY = "afdian_ui_source_tab";
+    const fxCanvas = document.getElementById("fx-layer");
+    const themeSelect = document.getElementById("theme_select");
+
+    function formatPercent(v) {
+        const n = Number(v || 0);
+        return `${Math.max(0, Math.min(100, n)).toFixed(1)}%`;
+    }
+
+    function updateProgress(job) {
+        const card = document.getElementById("job-card");
+        card.style.display = "block";
+
+        const overallPercent = Number(job.percent || 0);
+        const filePercent = Number(job.current_file_percent || 0);
+
+        document.getElementById("overall-progress").style.width = `${overallPercent}%`;
+        document.getElementById("overall-percent").textContent = formatPercent(overallPercent);
+        document.getElementById("overall-text").textContent = `总进度: ${job.processed || 0}/${job.total || 0} | 状态: ${job.status}`;
+
+        document.getElementById("file-progress").style.width = `${filePercent}%`;
+        document.getElementById("file-percent").textContent = formatPercent(filePercent);
+        document.getElementById("file-text").textContent = `当前文件: ${job.current || "-"}`;
+
+        const logs = (job.logs || []).slice(-20);
+        document.getElementById("job-logs").textContent = logs.length ? logs.join("\n") : "暂无日志";
+    }
+
+    async function pollJob(jobId) {
+        if (!jobId) {
+            return;
+        }
+
+        const card = document.getElementById("job-card");
+        card.style.display = "block";
+
+        while (true) {
+            try {
+                const resp = await fetch(`/job/${jobId}`, { cache: "no-store" });
+                if (!resp.ok) {
+                    break;
+                }
+                const data = await resp.json();
+                if (!data.ok) {
+                    break;
+                }
+
+                const job = data.job;
+                updateProgress(job);
+                if (job.status === "completed" || job.status === "failed") {
+                    break;
+                }
+            } catch (e) {
+                break;
+            }
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+    }
+
+    function initFxLayer() {
+        if (!fxCanvas) {
+            return () => {};
+        }
+        const ctx = fxCanvas.getContext("2d");
+        if (!ctx) {
+            return () => {};
+        }
+
+        const particles = [];
+        const particleCount = window.innerWidth < 900 ? 36 : 64;
+        let running = false;
+        let particleRgb = "104, 210, 255";
+        let particleMode = "orb";
+        let rainColumns = [];
+        const rainChars = "01#@$%&*+abcdefghijklmnopqrstuvwxyz";
+
+        function resize() {
+            fxCanvas.width = window.innerWidth;
+            fxCanvas.height = window.innerHeight;
+        }
+
+        function rand(min, max) {
+            return Math.random() * (max - min) + min;
+        }
+
+        function createParticle() {
+            return {
+                x: rand(0, fxCanvas.width),
+                y: rand(0, fxCanvas.height),
+                r: rand(0.8, 2.4),
+                vx: rand(-0.18, 0.18),
+                vy: rand(-0.25, 0.25),
+                a: rand(0.25, 0.75),
+            };
+        }
+
+        function initRainColumns() {
+            const colWidth = 16;
+            const count = Math.max(10, Math.floor(fxCanvas.width / colWidth));
+            rainColumns = Array.from({ length: count }, () => rand(-fxCanvas.height, fxCanvas.height));
+        }
+
+        function refreshFxConfig() {
+            const raw = getComputedStyle(document.body).getPropertyValue("--fx-particle-rgb").trim();
+            if (raw) {
+                particleRgb = raw;
+            }
+            const mode = getComputedStyle(document.body).getPropertyValue("--fx-particle-mode").trim();
+            particleMode = mode || "orb";
+            if (particleMode === "rain") {
+                initRainColumns();
+            }
+        }
+
+        resize();
+        refreshFxConfig();
+        for (let i = 0; i < particleCount; i += 1) {
+            particles.push(createParticle());
+        }
+
+        function frame() {
+            if (!running) {
+                ctx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
+                return;
+            }
+
+            ctx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
+            if (particleMode === "rain") {
+                const colWidth = 16;
+                ctx.fillStyle = "rgba(0, 0, 0, 0.06)";
+                ctx.fillRect(0, 0, fxCanvas.width, fxCanvas.height);
+                ctx.font = "14px Consolas";
+                for (let i = 0; i < rainColumns.length; i += 1) {
+                    const x = i * colWidth;
+                    const y = rainColumns[i];
+                    const char = rainChars[Math.floor(Math.random() * rainChars.length)];
+                    ctx.fillStyle = `rgba(${particleRgb}, 0.82)`;
+                    ctx.fillText(char, x, y);
+                    rainColumns[i] += rand(8, 16);
+                    if (rainColumns[i] > fxCanvas.height + 20) {
+                        rainColumns[i] = rand(-200, 0);
+                    }
+                }
+                requestAnimationFrame(frame);
+                return;
+            }
+
+            for (const p of particles) {
+                p.x += p.vx;
+                p.y += p.vy;
+
+                if (p.x < -10) p.x = fxCanvas.width + 10;
+                if (p.x > fxCanvas.width + 10) p.x = -10;
+                if (p.y < -10) p.y = fxCanvas.height + 10;
+                if (p.y > fxCanvas.height + 10) p.y = -10;
+
+                if (particleMode === "streak") {
+                    ctx.strokeStyle = `rgba(${particleRgb}, ${p.a})`;
+                    ctx.lineWidth = p.r;
+                    ctx.beginPath();
+                    ctx.moveTo(p.x, p.y);
+                    ctx.lineTo(p.x - p.vx * 26, p.y - p.vy * 26);
+                    ctx.stroke();
+                    continue;
+                }
+
+                if (particleMode === "diamond") {
+                    const size = p.r * 6;
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate((p.x + p.y) * 0.0018);
+                    ctx.fillStyle = `rgba(${particleRgb}, ${Math.min(0.9, p.a + 0.1)})`;
+                    ctx.fillRect(-size / 2, -size / 2, size, size);
+                    ctx.restore();
+                    continue;
+                }
+
+                const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 8);
+                grad.addColorStop(0, `rgba(${particleRgb}, ${p.a})`);
+                grad.addColorStop(1, `rgba(${particleRgb}, 0)`);
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.r * 8, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            requestAnimationFrame(frame);
+        }
+
+        window.addEventListener("resize", resize);
+
+        return (enabled) => {
+            refreshFxConfig();
+            running = enabled;
+            if (enabled) {
+                requestAnimationFrame(frame);
+            } else {
+                ctx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
+            }
+        };
+    }
+
+    function setupThemeStyle() {
+        const setFxRunning = initFxLayer();
+        const themeSet = new Set(["default", "neon", "holo", "terminal", "liquid"]);
+
+        function applyTheme(themeName) {
+            const theme = themeSet.has(themeName) ? themeName : "default";
+            const aiEnabled = theme !== "default";
+            document.body.setAttribute("data-theme", theme);
+            document.body.classList.toggle("ai-fx-enabled", aiEnabled);
+            setFxRunning(aiEnabled);
+            if (themeSelect) {
+                themeSelect.value = theme;
+            }
+            localStorage.setItem(THEME_STORAGE_KEY, theme);
+        }
+
+        let stored = localStorage.getItem(THEME_STORAGE_KEY);
+        if (!stored) {
+            const oldFxFlag = localStorage.getItem("afdian_ui_ai_fx");
+            stored = oldFxFlag === "1" ? "neon" : "default";
+        }
+
+        if (themeSelect) {
+            themeSelect.addEventListener("change", (event) => {
+                applyTheme(String(event.target.value || "default"));
+            });
+        }
+        applyTheme(stored);
+    }
+
+    function setupSourceTabs() {
+        const tabs = document.querySelectorAll(".tab-btn[data-tab]");
+        const panels = {
+            afdian: document.getElementById("tab-afdian"),
+            rss: document.getElementById("tab-rss"),
+            editor: document.getElementById("tab-editor"),
+        };
+
+        function applyTab(name) {
+            const next = (name === "rss" || name === "editor") ? name : "afdian";
+            tabs.forEach((el) => {
+                el.classList.toggle("active", el.dataset.tab === next);
+            });
+            Object.keys(panels).forEach((key) => {
+                if (panels[key]) {
+                    panels[key].classList.toggle("active", key === next);
+                }
+            });
+            localStorage.setItem(SOURCE_TAB_STORAGE_KEY, next);
+        }
+
+        const stored = localStorage.getItem(SOURCE_TAB_STORAGE_KEY);
+        const initial = (activeSource === "rss" || activeSource === "afdian" || activeSource === "editor") ? activeSource : (stored || "afdian");
+        applyTab(initial);
+
+        tabs.forEach((el) => {
+            el.addEventListener("click", () => applyTab(el.dataset.tab));
+        });
+    }
+
+    function setupAfdianMutualExclusion() {
+        const afdianPanel = document.getElementById("tab-afdian");
+        if (!afdianPanel) {
+            return;
+        }
+
+        const albumInput = afdianPanel.querySelector('input[name="album_id"]');
+        const postInput = afdianPanel.querySelector('textarea[name="post_ids"]');
+        const modeSelect = afdianPanel.querySelector('select[name="mode"]');
+        if (!albumInput || !postInput || !modeSelect) {
+            return;
+        }
+
+        function sync() {
+            const hasAlbum = albumInput.value.trim().length > 0;
+            const hasPost = postInput.value.trim().length > 0;
+
+            if (hasPost) {
+                albumInput.disabled = true;
+                postInput.disabled = false;
+                modeSelect.disabled = true;
+                return;
+            }
+
+            albumInput.disabled = false;
+            modeSelect.disabled = false;
+            postInput.disabled = hasAlbum;
+        }
+
+        albumInput.addEventListener("input", sync);
+        postInput.addEventListener("input", sync);
+        sync();
+    }
+
+    function setTagEditorMessage(text, level) {
+        const box = document.getElementById("tag-editor-message");
+        if (!box) {
+            return;
+        }
+        box.className = `flash ${level || "info"}`;
+        box.textContent = text;
+        box.style.display = "block";
+    }
+
+    function renderCoverPreview(dataUrl) {
+        const cover = document.getElementById("cover-preview");
+        const emptyText = document.getElementById("cover-empty-text");
+        if (!cover || !emptyText) {
+            return;
+        }
+
+        if (dataUrl) {
+            cover.src = dataUrl;
+            cover.style.display = "block";
+            emptyText.style.display = "none";
+        } else {
+            cover.removeAttribute("src");
+            cover.style.display = "none";
+            emptyText.style.display = "inline";
+        }
+    }
+
+    async function loadTagInfo() {
+        const filePath = (document.getElementById("edit_file_path")?.value || "").trim();
+        if (!filePath) {
+            setTagEditorMessage("请先填写音频文件路径。", "error");
+            return;
+        }
+
+        const payload = new URLSearchParams();
+        payload.set("file_path", filePath);
+
+        const resp = await fetch("/tag-editor/load", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+            body: payload.toString(),
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.ok) {
+            setTagEditorMessage(data.error || "读取失败。", "error");
+            return;
+        }
+
+        const v = data.data || {};
+        document.getElementById("edit_title").value = v.title || "";
+        document.getElementById("edit_artist").value = v.artist || "";
+        document.getElementById("edit_album").value = v.album || "";
+        document.getElementById("edit_year").value = v.year || "";
+        document.getElementById("edit_description").value = v.description || "";
+        renderCoverPreview(v.cover_data_url || "");
+        setTagEditorMessage("信息读取成功。", "success");
+    }
+
+    async function uploadAudioForEditor(file) {
+        const payload = new FormData();
+        payload.set("audio_file", file);
+        const resp = await fetch("/tag-editor/upload-audio", {
+            method: "POST",
+            body: payload,
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.ok) {
+            throw new Error(data.error || "上传失败");
+        }
+
+        const v = data.data || {};
+        document.getElementById("edit_file_path").value = v.file_path || "";
+        document.getElementById("edit_title").value = v.title || "";
+        document.getElementById("edit_artist").value = v.artist || "";
+        document.getElementById("edit_album").value = v.album || "";
+        document.getElementById("edit_year").value = v.year || "";
+        document.getElementById("edit_description").value = v.description || "";
+        renderCoverPreview(v.cover_data_url || "");
+        setTagEditorMessage("音频已导入（临时副本），可直接编辑并保存。", "success");
+    }
+
+    async function saveTagInfo() {
+        const form = document.getElementById("tag-editor-form");
+        if (!form) {
+            return;
+        }
+        const payload = new FormData(form);
+        const resp = await fetch("/tag-editor/save", {
+            method: "POST",
+            body: payload,
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.ok) {
+            setTagEditorMessage(data.error || "保存失败。", "error");
+            return;
+        }
+        setTagEditorMessage(data.message || "信息已保存。", "success");
+    }
+
+    function setupTagEditor() {
+        const loadBtn = document.getElementById("load-tag-btn");
+        const saveBtn = document.getElementById("save-tag-btn");
+        const fileInput = document.getElementById("edit_file_path");
+        const coverFileInput = document.getElementById("edit_cover_file");
+        const dropZone = document.getElementById("audio-drop-zone");
+        const tabBtn = document.querySelector('.tab-btn[data-tab="editor"]');
+
+        if (loadBtn) {
+            loadBtn.addEventListener("click", () => {
+                loadTagInfo().catch(() => setTagEditorMessage("读取失败。", "error"));
+            });
+        }
+        if (saveBtn) {
+            saveBtn.addEventListener("click", () => {
+                saveTagInfo().catch(() => setTagEditorMessage("保存失败。", "error"));
+            });
+        }
+        if (coverFileInput) {
+            coverFileInput.addEventListener("change", () => {
+                const f = coverFileInput.files && coverFileInput.files[0];
+                if (!f) {
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = () => renderCoverPreview(String(reader.result || ""));
+                reader.readAsDataURL(f);
+            });
+        }
+        if (dropZone) {
+            const setDrag = (flag) => dropZone.classList.toggle("dragover", flag);
+            const stop = (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+            };
+
+            ["dragenter", "dragover"].forEach((type) => {
+                dropZone.addEventListener(type, (event) => {
+                    stop(event);
+                    setDrag(true);
+                });
+            });
+            ["dragleave", "drop"].forEach((type) => {
+                dropZone.addEventListener(type, (event) => {
+                    stop(event);
+                    setDrag(false);
+                });
+            });
+
+            dropZone.addEventListener("drop", (event) => {
+                const dt = event.dataTransfer;
+                if (!dt) {
+                    return;
+                }
+
+                const files = dt.files || [];
+                const firstFile = files.length > 0 ? files[0] : null;
+                const uriRaw = (dt.getData("text/uri-list") || dt.getData("text/plain") || "").trim();
+                const tryLocalPath = () => {
+                    if (firstFile && typeof firstFile.path === "string" && firstFile.path.trim()) {
+                        return firstFile.path.trim();
+                    }
+                    if (!uriRaw.toLowerCase().startsWith("file://")) {
+                        return "";
+                    }
+                    try {
+                        let path = decodeURIComponent(uriRaw.replace(/\r?\n/g, "").replace(/^file:\/\//i, ""));
+                        if (/^\/[A-Za-z]:\//.test(path)) {
+                            path = path.slice(1);
+                        }
+                        return path.replace(/\//g, "\\");
+                    } catch (e) {
+                        return "";
+                    }
+                };
+
+                const localPath = tryLocalPath();
+                if (localPath && fileInput) {
+                    fileInput.value = localPath;
+                    loadTagInfo().catch(() => setTagEditorMessage("读取失败。", "error"));
+                    return;
+                }
+
+                if (firstFile) {
+                    uploadAudioForEditor(firstFile).catch((e) => setTagEditorMessage(e.message || "上传失败。", "error"));
+                    return;
+                }
+
+                setTagEditorMessage("未识别到可用音频文件。", "error");
+            });
+        }
+
+        document.querySelectorAll(".edit-record-link[data-path]").forEach((el) => {
+            el.addEventListener("click", (event) => {
+                event.preventDefault();
+                const path = (el.getAttribute("data-path") || "").trim();
+                if (!path) {
+                    return;
+                }
+                if (fileInput) {
+                    fileInput.value = path;
+                }
+                if (tabBtn) {
+                    tabBtn.click();
+                }
+                loadTagInfo().catch(() => setTagEditorMessage("读取失败。", "error"));
+            });
+        });
+    }
+
+    setupSourceTabs();
+    setupThemeStyle();
+    setupAfdianMutualExclusion();
+    setupTagEditor();
+    pollJob(activeJobId);
+</script>
+</body>
+</html>

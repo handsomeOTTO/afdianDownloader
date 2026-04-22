@@ -1,0 +1,11 @@
+*.mp3
+.idea
+*.png
+*.m4a
+.venv/
+__pycache__/
+*.pyc
+data/downloads.db
+media/downloads/
+logs/
+AGENTS.md
